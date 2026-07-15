@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Sphere Runner - Three.js</title>
+    <!-- Link to external styling file -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Include Three.js via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <!-- Lobby / Main Menu Screen Overlay -->
+    <div id="lobby-screen">
+        <h1 class="title">SPHERE RUNNER 3D</h1>
+        <p class="instructions">Use <b>A / D</b> or <b>Left / Right Arrow</b> keys to dodge obstacles.</p>
+        <p class="hint">💡 Click the floating player sphere to change its color!</p>
+        <button id="start-btn">START GAME</button>
+    </div>
+
+    <!-- Active Gameplay HUD Elements -->
+    <div id="score-board" style="display: none;">Score: <span id="score">0</span></div>
+    <div id="game-over">GAME OVER<span>Returning to lobby...</span></div>
+
+    <!-- Link to external game logic file -->
+    <script src="script.js"></script>
+</body>
+</html>
