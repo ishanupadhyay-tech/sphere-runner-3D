@@ -15,19 +15,38 @@
 </head>
 <body>
 
+    <!-- Roblox-Style Login / Register Overlay -->
+    <div id="auth-screen" class="auth-overlay">
+        <div class="auth-box">
+            <h2>SPHERE RUNNER PORTAL</h2>
+            <p class="auth-subtitle">Create or log into your account to save progress!</p>
+            
+            <input type="text" id="username-input" placeholder="Enter Username" autocomplete="off">
+            <input type="password" id="password-input" placeholder="Password (A-Z, a-z, 0-9, symbol)">
+            
+            <p id="auth-error" class="error-msg"></p>
+            
+            <button id="login-btn">LOGIN / SIGN UP</button>
+        </div>
+    </div>
+
     <!-- Lobby / Main Menu Screen Overlay -->
-    <div id="lobby-screen">
+    <div id="lobby-screen" style="display: none;">
         <h1 class="title">SPHERE RUNNER 3D</h1>
         <p class="instructions">Use <b>A / D</b> or <b>Left / Right Arrow</b> keys to dodge obstacles.</p>
         <p class="hint">💡 Click the floating player sphere to change its color!</p>
         <button id="start-btn">START GAME</button>
     </div>
 
+    <!-- Logged-in User HUD Header -->
+    <div id="user-hud"></div>
+
     <!-- Active Gameplay HUD Elements -->
     <div id="score-board" style="display: none;">Score: <span id="score">0</span></div>
     <div id="game-over">GAME OVER<span>Returning to lobby...</span></div>
 
     <!-- Link to external game logic file -->
+    
     <script src="script.js"></script>
 </body>
 </html>

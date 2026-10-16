@@ -1,9 +1,110 @@
 body {
     margin: 0;
     overflow: hidden;
-    background-color: #111;
+    background-color: #1e1e2f;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     user-select: none;
+}
+
+/* Roblox-Style Auth Modal */
+.auth-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 20, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.auth-box {
+    background: #1e1e2f;
+    padding: 35px 50px;
+    border-radius: 16px;
+    border: 2px solid #ff007f;
+    box-shadow: 0 0 30px rgba(255, 0, 127, 0.4);
+    text-align: center;
+    width: 320px;
+}
+
+.auth-box h2 {
+    color: #ff007f;
+    margin-bottom: 5px;
+    font-size: 24px;
+    letter-spacing: 1px;
+}
+
+.auth-subtitle {
+    font-size: 12px;
+    color: #b2bec3;
+    margin-bottom: 20px;
+}
+
+.auth-box input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #111118;
+    border: 1px solid #4e54c8;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.auth-box input:focus {
+    border-color: #00d2ff;
+    outline: none;
+}
+
+.error-msg {
+    color: #ff416c;
+    font-size: 11px;
+    margin-bottom: 15px;
+    min-height: 15px;
+}
+
+#login-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #ff007f 0%, #4e54c8 100%);
+    border: none;
+    color: white;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4);
+}
+
+#login-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(255, 0, 127, 0.6);
+}
+
+#login-btn:active {
+    transform: scale(0.98);
+}
+
+/* User Profile HUD */
+#user-hud {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: #00d2ff;
+    font-size: 15px;
+    font-weight: bold;
+    z-index: 10;
+    background: rgba(26, 26, 46, 0.85);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #00d2ff;
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+    display: none;
 }
 
 /* Lobby Screen UI Panel */

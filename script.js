@@ -10,6 +10,16 @@ let trackLength = 100;
 let gameSpeed = 0.5;
 let score = 0;
 
+// User Session Variables
+let currentUser = null;
+let userHighScore = 0;
+
+// Upgraded Movement & Velocity Variables
+let playerVelocityX = 0;
+const playerAcceleration = 0.08;
+const playerDamping = 0.75;
+const maxSpeed = 0.3;
+
 // Input Tracking
 const keys = { Left: false, Right: false };
 const raycaster = new THREE.Raycaster();
@@ -18,16 +28,83 @@ const mouse = new THREE.Vector2();
 const skinColors = [0x00d2ff, 0xff007f, 0x00ffcc, 0xffcc00, 0x9b59b6];
 let colorIndex = 0;
 
+// Reusable bounding boxes to eliminate lag
+const playerBox = new THREE.Box3();
+const obsBox = new THREE.Box3();
+
+// --- AUTHENTICATION & INITIALIZATION SYSTEM ---
+document.addEventListener('DOMContentLoaded', () => {
+    const loginBtn = document.getElementById('login-btn');
+    const usernameInput = document.getElementById('username-input');
+    const passwordInput = document.getElementById('password-input');
+    const errorMsg = document.getElementById('auth-error');
+
+    loginBtn.addEventListener('click', () => {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username || !password) {
+            errorMsg.innerText = "Please fill in all fields.";
+            return;
+        }
+
+        // Retrieve user database from localStorage
+        let usersDB = JSON.parse(localStorage.getItem('sphere_runner_users')) || {};
+
+        if (usersDB[username]) {
+            // Existing Account: Check Password
+            if (usersDB[username].password === password) {
+                currentUser = username;
+                userHighScore = usersDB[username].highScore || 0;
+                launchLobbySession();
+            } else {
+                errorMsg.innerText = "Incorrect password for this username.";
+            }
+        } else {
+            // New Account Registration: Enforce Strict Password Criteria
+            const hasCapital = /[A-Z]/.test(password);
+            const hasSmall = /[a-z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSymbol = /[^A-Za-z0-9]/.test(password);
+            const isValidLength = password.length >= 6;
+
+            if (!hasCapital || !hasSmall || !hasNumber || !hasSymbol || !isValidLength) {
+                errorMsg.innerText = "Password must have A-Z, a-z, 0-9 & a symbol (min 6 chars).";
+                return;
+            }
+
+            // Save new user to database
+            usersDB[username] = { password: password, highScore: 0 };
+            localStorage.setItem('sphere_runner_users', JSON.stringify(usersDB));
+
+            currentUser = username;
+            userHighScore = 0;
+            launchLobbySession();
+        }
+    });
+});
+
+function launchLobbySession() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('lobby-screen').style.display = 'block';
+    
+    const userHud = document.getElementById('user-hud');
+    userHud.style.display = 'block';
+    userHud.innerHTML = `👤 ${currentUser} | Best: <span id="best-score">${userHighScore}</span>`;
+    
+    init();
+}
+
 // --- 1. SETUP CORE SCENE ---
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
-    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
+    scene.background = new THREE.Color(0x1e1e2f);
+    scene.fog = new THREE.FogExp2(0x1e1e2f, 0.015);
 
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     setLobbyCamera();
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
@@ -39,8 +116,8 @@ function init() {
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(10, 20, 10);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.mapSize.width = 512;
+    dirLight.shadow.mapSize.height = 512;
     scene.add(dirLight);
 
     // --- ENVIRONMENT (THE TRACK) ---
@@ -52,7 +129,7 @@ function init() {
     scene.add(track);
 
     // --- PLAYER (SPHERE) ---
-    const playerGeo = new THREE.SphereGeometry(0.6, 32, 32);
+    const playerGeo = new THREE.SphereGeometry(0.6, 16, 16);
     const playerMat = new THREE.MeshStandardMaterial({ color: skinColors[colorIndex], roughness: 0.1, metalness: 0.5 });
     player = new THREE.Mesh(playerGeo, playerMat);
     player.castShadow = true;
@@ -66,60 +143,50 @@ function init() {
     window.addEventListener('keydown', (e) => handleInputs(e, true));
     window.addEventListener('keyup', (e) => handleInputs(e, false));
     window.addEventListener('resize', onWindowResize);
-    window.addEventListener('click', onLobbyClick); // Catch mouse target intersections
+    window.addEventListener('click', onLobbyClick);
 
-    // --- MOBILE TOUCH CONTROLS ---
-    window.addEventListener('touchstart', (e) => {
-        if (currentState !== STATES.PLAYING) return;
-        
-        // Get the X coordinate of the first touch
-        const touchX = e.touches[0].clientX;
-        const screenWidth = window.innerWidth;
-
-        // If touched on the left half of the screen
-        if (touchX < screenWidth / 2) {
-            keys.Left = true;
-            keys.Right = false;
-        } else { // If touched on the right half
-            keys.Right = true;
-            keys.Left = false;
-        }
-    });
-
-    // Stop moving when the finger is lifted off the screen
-    window.addEventListener('touchend', () => {
+    // Safety fix against ghost inputs
+    window.addEventListener('blur', () => {
         keys.Left = false;
         keys.Right = false;
+        playerVelocityX = 0;
+    });
+
+    window.addEventListener('touchstart', (e) => {
+        if (currentState !== STATES.PLAYING) return;
+        const touchX = e.touches[0].clientX;
+        keys.Left = touchX < window.innerWidth / 2;
+        keys.Right = touchX >= window.innerWidth / 2;
+    });
+
+    window.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            keys.Left = false;
+            keys.Right = false;
+        }
     });
     
     document.getElementById('start-btn').addEventListener('click', startGame);
 
-    // Start Engine Loop
     animate();
 }
 
-// --- LOBBY MINI GAME: INTUITIVE MOUSE RAYCASTING ---
 function onLobbyClick(event) {
     if (currentState !== STATES.LOBBY) return;
 
-    // Convert flat screen coordinates into normal -1 to +1 WebGL coordinates
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObject(player);
 
-    // Check if player click touches the sphere model boundary
     if (intersects.length > 0) {
         colorIndex = (colorIndex + 1) % skinColors.length;
         player.material.color.setHex(skinColors[colorIndex]);
-        
-        // Add a little dynamic scale bounce feedback
         player.scale.set(1.3, 1.3, 1.3);
     }
 }
 
-// --- STATE MANAGEMENT ---
 function setLobbyCamera() {
     camera.position.set(2, 2.5, 4);
     camera.lookAt(0, 0.6, 0);
@@ -132,6 +199,9 @@ function setGameplayCamera() {
 
 function resetPlayerPosition() {
     player.position.set(0, 0.6, 0);
+    playerVelocityX = 0;
+    keys.Left = false;
+    keys.Right = false;
 }
 
 function spawnObstaclesPool() {
@@ -166,7 +236,6 @@ function startGame() {
     currentState = STATES.PLAYING;
 }
 
-// --- CONTROLS & RESIZE ---
 function handleInputs(event, isPressed) {
     if (currentState !== STATES.PLAYING) return;
     if (event.key === 'ArrowLeft' || event.key === 'a' || event.key === 'A') keys.Left = isPressed;
@@ -179,7 +248,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// --- ENGINE REFRESH LOOP ---
 function animate() {
     requestAnimationFrame(animate);
 
@@ -187,21 +255,36 @@ function animate() {
         player.rotation.y += 0.01;
         player.position.y = 0.6 + Math.sin(Date.now() * 0.003) * 0.1;
         
-        // Return click scale back down smoothly
         player.scale.x = THREE.MathUtils.lerp(player.scale.x, 1, 0.1);
         player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1, 0.1);
         player.scale.z = THREE.MathUtils.lerp(player.scale.z, 1, 0.1);
     } 
     else if (currentState === STATES.PLAYING) {
-        if (keys.Left && player.position.x > -trackWidth / 2 + 0.6) player.position.x -= 0.15;
-        if (keys.Right && player.position.x < trackWidth / 2 - 0.6) player.position.x += 0.15;
+        if (keys.Left) playerVelocityX -= playerAcceleration;
+        if (keys.Right) playerVelocityX += playerAcceleration;
+
+        playerVelocityX *= playerDamping;
+        playerVelocityX = Math.max(Math.min(playerVelocityX, maxSpeed), -maxSpeed);
+
+        player.position.x += playerVelocityX;
+
+        // Clean boundary clamping
+        const halfWidth = trackWidth / 2 - 0.6;
+        if (player.position.x < -halfWidth) {
+            player.position.x = -halfWidth;
+            playerVelocityX = 0;
+        } else if (player.position.x > halfWidth) {
+            player.position.x = halfWidth;
+            playerVelocityX = 0;
+        }
+
+        playerBox.setFromObject(player);
 
         obstacles.forEach((obs) => {
             obs.position.z += gameSpeed;
             obs.rotation.x += 0.02;
 
-            const playerBox = new THREE.Box3().setFromObject(player);
-            const obsBox = new THREE.Box3().setFromObject(obs);
+            obsBox.setFromObject(obs);
 
             if (playerBox.intersectsBox(obsBox)) {
                 triggerGameOver();
@@ -213,6 +296,18 @@ function animate() {
                 score += 10;
                 document.getElementById('score').innerText = score;
 
+                // Auto-save high score check
+                if (score > userHighScore) {
+                    userHighScore = score;
+                    document.getElementById('best-score').innerText = userHighScore;
+
+                    let usersDB = JSON.parse(localStorage.getItem('sphere_runner_users')) || {};
+                    if (usersDB[currentUser]) {
+                        usersDB[currentUser].highScore = userHighScore;
+                        localStorage.setItem('sphere_runner_users', JSON.stringify(usersDB));
+                    }
+                }
+
                 if (score % 50 === 0) gameSpeed += 0.05;
             }
         });
@@ -223,7 +318,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// --- GAME OVER HOOK ---
 function triggerGameOver() {
     currentState = STATES.GAMEOVER;
     document.getElementById('game-over').style.display = 'block';
@@ -238,5 +332,3 @@ function triggerGameOver() {
         currentState = STATES.LOBBY;
     }, 2000);
 }
-
-window.onload = init;
